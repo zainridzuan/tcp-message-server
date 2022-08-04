@@ -11,32 +11,46 @@ Each client needs to be initiated as:
 '''
 
 from socket import *
+from datetime import datetime
+from getpass import getpass
 import json
 import sys
 
-def login(username, password, client_socket):
+authenticated = False
+
+def user_login(username, password, client_socket):
+    global authenticated
     request = {
-        'request_type': 'login',
-        'username': username,
-        'password': password
+        "username": username,
+        "password": password
     }
 
-    while 1:
-        client_socket.send(bytes(json.dumps(request).encode('utf-8')))
-
-        response = client_socket.recv(1024)
-        response = response.decode('utf-8')
+    client_socket.send(bytes(json.dumps(request).encode()))
+    while True:
+        payload = client_socket.recv(1024)
+        response = payload.decode('utf-8')
         # We wait to receive the reply from the server, store it in response
         
-        if response == 'Success':
+        if response == "login success":
             print("Login Successful!")
+            authenticated = True
+            curr_time = datetime.now()
+            print(curr_time.strftime("%d/%m/%Y %H:%M:%S"))
+            hostname = gethostname()
+            IP_addr = gethostbyname(hostname)
+            print(IP_addr)
+            payload = client_socket.recv(1024)
+            login_info = json.loads(payload.decode('utf-8'))
+            print(login_info)
             break
-        elif response == 'Failure':
-            print('Invalid username and/or password. Please try again.')
-            request['username'] = input('Enter username: ')
-            request['password'] = input('Enter password: ')
-        elif response == 'Blocked':
-            print('Invalid password. Your account has been blocked due to multiple unsuccessful login attempts. Please try again later.')
+        elif response == "login failure":
+            print("Invalid password. Please try again.")
+            request["password"] = getpass()
+            client_socket.sendall("login".encode())
+            client_socket.recv(1024)
+            client_socket.send(bytes(json.dumps(request), encoding='utf-8'))
+        elif response == "user blocked":
+            print("Your account has been blocked due to multiple unsuccessful login attempts. Please try again later.")
             exit()
         else:
             print(response)
@@ -46,20 +60,38 @@ def connect_to_server(server_name, server_port):
     client_socket = socket(AF_INET, SOCK_STREAM)
     client_socket.connect((server_name, server_port))
 
-    login_success = 0
+    while True:
+        sent_message = input("===== Please type any messsage you want to send to server: =====\n")
+        client_socket.sendall(sent_message.encode())
 
+        data = client_socket.recv(1024)
+        recv_message = data.decode()
 
-    username = input('Enter username: ')
-    password = input('Enter password: ')
-    login(username, password, client_socket)
+        # parse the message received from server and take corresponding actions
+        if recv_message == "":
+            print("[recv] Message from server is empty!")
+        elif recv_message == "user credentials request":
+            print("[recv] Please provide username and password to login")
+            username = input("Username: ")
+            password = getpass()
+            user_login(username, password, client_socket)
+            #if authenticated is True:
+        else:
+            print("[recv] Message makes no sense")
+            
+        ans = input("Do you want to continue (y/n): ")
+        if ans == 'y':
+            continue
+        else:
+            break
 
     client_socket.close()
-    # and close the socket
+    # close the socket
 
 if __name__ == '__main__':
-    #if len(sys.argv) != 3:
-    #    print('Try python3 client.py <server_IP> <server_port>')
-    #    exit()
+    if len(sys.argv) != 3:
+        print("\n===== Error usage, try python3 client.py <server_IP> <server_port> ======\n")
+        exit()
     
     server_IP = sys.argv[1]
     server_port = int(sys.argv[2])
