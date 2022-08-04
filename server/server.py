@@ -22,6 +22,7 @@ login_attempts = {}
 blocked = {}
 when_blocked = {}
 active_users = []
+userlog = []
 
 class ClientThread(Thread):
     def __init__(self, client_address, client_socket):
@@ -34,8 +35,9 @@ class ClientThread(Thread):
         self.client_alive = True
 
     def run(self): 
+        global userlog
+    
         message=""
-
         while self.client_alive:
             # use recv() to receive message from the client
             data = self.client_socket.recv(1024)
@@ -45,6 +47,19 @@ class ClientThread(Thread):
             if message == "":
                 self.client_alive = False
                 print(f"===== the user disconnected - {self.client_address}")
+                
+                # remove user off active_users and userlog and then update userlog.txt
+                dict = address_to_userlog_dict(userlog, self.client_address)
+                username = dict["username"]
+                index = active_users.index(username)
+                active_users.remove(username)
+                seq_no = dict["active user sequence number"]
+                userlog[:] = [d for d in userlog if d.get("active user sequence number") != seq_no]
+
+                for i in range(index, len(userlog)):
+                    userlog[i]["active user sequence number"] = userlog[i]["active user sequence number"] - 1
+                update_userlog(userlog)
+                print(userlog)
                 break
 
             # handle message from the client
@@ -57,6 +72,8 @@ class ClientThread(Thread):
         global number_of_consecutive_failed_attempts
         global blocked
         global when_blocked
+        global active_users
+        global userlog
         
         server_message = "user credentials request"
         print(f"[send] {server_message} for {self.client_address}")
@@ -101,14 +118,15 @@ class ClientThread(Thread):
                 # send json with following information
                 # active user sequence number; timestamp; username; client IP address; client UDP server port number
                 login_info = {
-                    "active user sequence number": active_users.index(username),
-                    "timestamp": datetime.now,
-                    "username": "",                        # Maybe leave this info for client-side (?) 
-                    "client IP address": "",               # Maybe leave this info for client-side (?)   
-                    "client UDP server port number": ""    # Maybe leave this info for client-side (?)         
+                    "active user sequence number": active_users.index(username) + 1,
+                    "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    "username": username,                        
+                    "client IP address": self.client_address                  
+                    #"client UDP server port number": ""           
                 }
+                userlog.append(login_info)
+                add_userlog(login_info)
                 self.client_socket.send('login success'.encode())
-                self.client_socket.send(bytes(json.dumps(active_users), encoding='utf-8'))
             elif credentials[username] != password:
                 if username not in login_attempts:
                     login_attempts[username] = 0
@@ -139,7 +157,8 @@ if __name__ == "__main__":
     server_port = int(sys.argv[1])
     number_of_consecutive_failed_attempts = int(sys.argv[2])
     if number_of_consecutive_failed_attempts not in range(1,6):
-        print("Invalid number of allowed failed consecutive attempt")
+        print("\n===== Invalid number of allowed failed consecutive attempt ======\n")
         exit()
     
+    clear_userlog()
     start_server(server_host, server_port)

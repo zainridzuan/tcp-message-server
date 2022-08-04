@@ -34,14 +34,6 @@ def user_login(username, password, client_socket):
         if response == "login success":
             print("Login Successful!")
             authenticated = True
-            curr_time = datetime.now()
-            print(curr_time.strftime("%d/%m/%Y %H:%M:%S"))
-            hostname = gethostname()
-            IP_addr = gethostbyname(hostname)
-            print(IP_addr)
-            payload = client_socket.recv(1024)
-            login_info = json.loads(payload.decode('utf-8'))
-            print(login_info)
             break
         elif response == "login failure":
             print("Invalid password. Please try again.")
