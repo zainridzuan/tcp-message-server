@@ -82,7 +82,10 @@ def connect_to_server(server_name, server_port):
                 for i in everyone_else_userlog:
                     print(f"{i['username']}; {i['client IP address'][0]}; active since {i['timestamp']};")
         elif recv_message == "message sent successfully":
-            print(f"> Message sent successfully!")
+            print("> Message sent successfully!")
+            payload = client_socket.recv(1024)
+            msg = json.loads(payload.decode('utf-8'))
+            print(f"> {msg['message_type']}; {msg['sequence_number']}; {msg['timestamp']}")
         else:
             print("> [recv] Invalid command!")
 

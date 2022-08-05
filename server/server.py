@@ -63,13 +63,16 @@ class ClientThread(Thread):
             elif message == "login":
                 print(f"[recv] new login request from {self.client_address}")
                 self.process_login()
-            elif re.match("BCM\s.*", message):
-                print(f"[recv] new BCM request from {self.client_address}")
-                bcm_msg = message.split(" ", 1)
-                msg = bcm_msg[1]
-                self.process_bcm(msg)
-                server_message = "[recv] Message"
-                self.client_socket.sendall(server_message.encode())                    
+            elif re.match("BCM *", message):
+                if re.match("BCM\s+(?![a-zA-Z!@#$%.?,])", message): 
+                    print(f"[recv] invalid BCM request from {self.client_address}")
+                    server_message = "invalid BCM request"
+                    self.client_socket.sendall(server_message.encode()) 
+                else:
+                    print(f"[recv] new BCM request from {self.client_address}")
+                    bcm_msg = message.split(" ", 1)
+                    msg = bcm_msg[1]
+                    self.process_bcm(msg)             
             elif message == "ATU":
                 self.process_atu()
             elif message == "SRS":
@@ -168,7 +171,7 @@ class ClientThread(Thread):
         msg_confirm = add_messsagelog(msg_details)
         server_message = "message sent successfully"
         self.client_socket.sendall(server_message.encode())
-        self.client_socket.sendall(msg_confirm.encode())
+        self.client_socket.send(bytes(json.dumps(msg_confirm).encode()))
         print(f"[send] message sent successfully for {self.client_address}")
 
     # handles download active users
