@@ -81,6 +81,8 @@ def connect_to_server(server_name, server_port):
             else:
                 for i in everyone_else_userlog:
                     print(f"{i['username']}; {i['client IP address'][0]}; active since {i['timestamp']};")
+        elif recv_message == "message sent successfully":
+            print(f"> Message sent successfully!")
         else:
             print("> [recv] Invalid command!")
 

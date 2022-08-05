@@ -38,3 +38,13 @@ def update_userlog(login_info):
     for dict in login_info:
         f.write(f"{dict['active user sequence number']}; {dict['timestamp']}; {dict['username']}; {dict['client IP address'][0]};\n")
     f.close()
+    
+# used to clear messagelog on server startup
+def clear_messagelog():
+    with open("messagelog.txt", "w+") as f:
+        f.truncate()
+
+def add_messsagelog(msg_details):
+    f = open("messagelog.txt", "a")
+    f.write(f"{msg_details['message sequence number']}; {msg_details['timestamp']}; {msg_details['username']}; {msg_details['message']};\n")
+    f.close

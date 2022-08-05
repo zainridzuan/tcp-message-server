@@ -15,7 +15,7 @@ from server_utils import *
 from threading import Thread
 from numpy import number
 from datetime import datetime, timedelta
-import json, sys, select
+import json, sys, select, re
 
 number_of_consecutive_failed_attempts = 0
 login_attempts = {}
@@ -23,6 +23,7 @@ blocked = {}
 when_blocked = {}
 active_users = []
 userlog = []
+message_count = 0
 
 class ClientThread(Thread):
     def __init__(self, client_address, client_socket):
@@ -62,8 +63,13 @@ class ClientThread(Thread):
             elif message == "login":
                 print(f"[recv] new login request from {self.client_address}")
                 self.process_login()
-            elif message == "BCM":
-                self.process_bcm()
+            elif re.match("BCM\s.*", message):
+                print(f"[recv] new BCM request from {self.client_address}")
+                bcm_msg = message.split(" ", 1)
+                msg = bcm_msg[1]
+                self.process_bcm(msg)
+                server_message = "[recv] Message"
+                self.client_socket.sendall(server_message.encode())                    
             elif message == "ATU":
                 self.process_atu()
             elif message == "SRS":
@@ -149,8 +155,20 @@ class ClientThread(Thread):
             self.client_socket.send('invalid username'.encode())
 
     # handles broadcast message
-    def process_bcm(self):
-        return None
+    def process_bcm(self, message):
+        global message_count
+        message_count = message_count + 1
+        dict = address_to_userlog_dict(userlog, self.client_address)
+        msg_details = { 
+            "message sequence number": message_count,
+            "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "username": dict['username'],
+            "message": message
+        }
+        add_messsagelog(msg_details)
+        print(f"[send] message sent successfully for {self.client_address}")
+        server_message = "message sent successfully"
+        self.client_socket.sendall('message sent successfully'.encode())
 
     # handles download active users
     def process_atu(self):
@@ -202,4 +220,5 @@ if __name__ == "__main__":
         exit()
     
     clear_userlog()
+    clear_messagelog()
     start_server(server_host, server_port)
