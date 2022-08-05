@@ -29,8 +29,7 @@ class ClientThread(Thread):
         Thread.__init__(self)
         self.client_address = client_address
         self.client_socket = client_socket
-        self.client_alive = False
-        
+        self.client_alive = False        
         print(f"===== New connection created for: {client_address} =====")
         self.client_alive = True
 
@@ -59,14 +58,27 @@ class ClientThread(Thread):
                 for i in range(index, len(userlog)):
                     userlog[i]["active user sequence number"] = userlog[i]["active user sequence number"] - 1
                 update_userlog(userlog)
-                print(userlog)
                 break
-
-            # handle message from the client
-            if message == 'login':
-                print(f"[recv] new login request for {self.client_address}")
+            elif message == "login":
+                print(f"[recv] new login request from {self.client_address}")
                 self.process_login()
-
+            elif message == "BCM":
+                self.process_bcm()
+            elif message == "ATU":
+                self.process_atu()
+            elif message == "SRS":
+                self.process_srs()
+            elif message == "RDM":
+                self.process_rdm()
+            elif message == "OUT":
+                print(f"[recv] new logout request from {self.client_address}")
+                self.process_out()
+            else:
+                print(f"[recv] unknown input from {self.client_address}")
+                server_message = "unknown input"
+                self.client_socket.sendall(server_message.encode())
+            
+    # handle client login
     def process_login(self):
         global login_attempts
         global number_of_consecutive_failed_attempts
@@ -135,6 +147,35 @@ class ClientThread(Thread):
                 self.client_socket.send('login failure'.encode())
         else:
             self.client_socket.send('invalid username'.encode())
+
+    # handles broadcast message
+    def process_bcm(self):
+        return None
+
+    # handles download active users
+    def process_atu(self):
+        everyone_else_log = []
+        for i in userlog:
+            if i['client IP address'] != self.client_address:
+                everyone_else_log.append(i)
+        server_message = "active users request"
+        print(f"[send] {server_message} for {self.client_address}") 
+        self.client_socket.sendall(server_message.encode())
+        self.client_socket.send(bytes(json.dumps(everyone_else_log).encode()))
+
+    # handle separate room service
+    def process_srs(self):
+        return None
+
+    # handles read message
+    def process_rdm(self):
+        return None
+
+    # handles logout
+    def process_out(self):
+        server_message = "logout request"
+        print(f"[send] {server_message} for {self.client_address}")
+        self.client_socket.sendall("logout".encode())
 
 def start_server(server_host, server_port):
     server_address = (server_host, server_port)

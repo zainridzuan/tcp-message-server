@@ -30,19 +30,18 @@ def user_login(username, password, client_socket):
         payload = client_socket.recv(1024)
         response = payload.decode('utf-8')
         # We wait to receive the reply from the server, store it in response
-        
         if response == "login success":
-            print("Login Successful!")
+            print("> Login Successful!")
             authenticated = True
             break
         elif response == "login failure":
-            print("Invalid password. Please try again.")
+            print("> Invalid password. Please try again.")
             request["password"] = getpass()
             client_socket.sendall("login".encode())
             client_socket.recv(1024)
             client_socket.send(bytes(json.dumps(request), encoding='utf-8'))
         elif response == "user blocked":
-            print("Your account has been blocked due to multiple unsuccessful login attempts. Please try again later.")
+            print("> Your account has been blocked due to multiple unsuccessful login attempts. Please try again later.")
             exit()
         else:
             print(response)
@@ -51,31 +50,39 @@ def user_login(username, password, client_socket):
 def connect_to_server(server_name, server_port):
     client_socket = socket(AF_INET, SOCK_STREAM)
     client_socket.connect((server_name, server_port))
-
+    initial_login = True
     while True:
-        sent_message = input("===== Please type any messsage you want to send to server: =====\n")
-        client_socket.sendall(sent_message.encode())
+        if initial_login == True:
+            client_socket.sendall("login".encode())
+            initial_login = False
+        else:
+            sent_message = input("===== Enter one of the following commands [BCM, ATU, SRB, SRM, RDM, OUT] =====\n> ")
+            client_socket.sendall(sent_message.encode())
 
         data = client_socket.recv(1024)
         recv_message = data.decode()
 
         # parse the message received from server and take corresponding actions
         if recv_message == "":
-            print("[recv] Message from server is empty!")
+            print("> [recv] Message from server is empty!")
         elif recv_message == "user credentials request":
-            print("[recv] Please provide username and password to login")
-            username = input("Username: ")
-            password = getpass()
+            print("> [recv] Please provide username and password to login")
+            username = input("username: ")
+            password = getpass("password: ")
             user_login(username, password, client_socket)
-            #if authenticated is True:
-        else:
-            print("[recv] Message makes no sense")
-            
-        ans = input("Do you want to continue (y/n): ")
-        if ans == 'y':
-            continue
-        else:
+        elif recv_message == "logout":
+            print(f"> Goodbye, {username}")
             break
+        elif recv_message == "active users request":
+            payload = client_socket.recv(1024)
+            everyone_else_userlog = json.loads(payload.decode('utf-8'))
+            if everyone_else_userlog == []:
+                print("> No other active users...")
+            else:
+                for i in everyone_else_userlog:
+                    print(f"{i['username']}; {i['client IP address'][0]}; active since {i['timestamp']};")
+        else:
+            print("> [recv] Invalid command!")
 
     client_socket.close()
     # close the socket
