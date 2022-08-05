@@ -23,6 +23,7 @@ blocked = {}
 when_blocked = {}
 active_users = []
 userlog = []
+rooms = []
 message_count = 0
 
 class ClientThread(Thread):
@@ -40,7 +41,7 @@ class ClientThread(Thread):
         message=""
         while self.client_alive:
             # use recv() to receive message from the client
-            data = self.client_socket.recv(1024)
+            data = self.client_socket.recv(4096)
             message = data.decode()
 
             # if the message from client is empty, the client would be off-line then set the client as offline (alive=Flase)
@@ -74,9 +75,16 @@ class ClientThread(Thread):
                     msg = bcm_msg[1]
                     self.process_bcm(msg)             
             elif message == "ATU":
+                print(f"[recv] new ATU request from {self.client_address}")
                 self.process_atu()
-            elif message == "SRS":
-                self.process_srs()
+            elif re.match("SRB [^ ].*", message):
+                print(f"[recv] new SRB request from {self.client_address}")
+                users = message.split(" ", 1)[1]
+                set_users = set(users.split())
+                print(set_users)
+                self.process_srb(set_users)
+            elif message == "SRM":
+                self.process_srm()
             elif message == "RDM":
                 self.process_rdm()
             elif message == "OUT":
@@ -147,6 +155,8 @@ class ClientThread(Thread):
                 }
                 userlog.append(login_info)
                 add_userlog(login_info)
+                if username in login_attempts:
+                    login_attempts[username] = 0
                 self.client_socket.send('login success'.encode())
             elif credentials[username] != password:
                 if username not in login_attempts:
@@ -177,17 +187,53 @@ class ClientThread(Thread):
     # handles download active users
     def process_atu(self):
         everyone_else_log = []
+        #print(userlog)
         for i in userlog:
             if i['client IP address'] != self.client_address:
                 everyone_else_log.append(i)
+        print(everyone_else_log)
         server_message = "active users request"
         print(f"[send] {server_message} for {self.client_address}") 
         self.client_socket.sendall(server_message.encode())
         self.client_socket.send(bytes(json.dumps(everyone_else_log).encode()))
 
-    # handle separate room service
-    def process_srs(self):
-        return None
+    # handle separate room building
+    def process_srb(self, user_set):
+        global rooms
+        checked_users = are_they_online(user_set)
+        print(checked_users)
+        offline = set()
+        invalid = set()
+        for user in checked_users:
+            if checked_users[user] == "offline":
+                offline.add(user)
+            elif checked_users[user] == "invalid":
+                invalid.add(user)
+
+        if offline and invalid:
+            room_info = {
+                "room_id": len(rooms) + 1,
+                "users": user_set
+            }
+            rooms.append(room_info)
+            filename = f"SR_{room_info['room_id']}_messagelog.txt"
+            f = open(filename, 'x')
+            f.close
+            server_message = "successful separate room creation"
+            self.client_socket.sendall(server_message.encode())
+            self.client_socket.send(bytes(json.dumps(room_info).encode()))
+        else:
+            server_message = "unsuccessful room creation"
+            self.client_socket.sendall(server_message.encode())
+            server_message = str(offline)
+            self.client_socket.sendall(server_message.encode())
+            server_message = str(invalid)
+            self.client_socket.sendall(server_message.encode())
+
+
+    # handle separate room message
+    def process_srm(self):
+        return None 
 
     # handles read message
     def process_rdm(self):
@@ -216,7 +262,7 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("\n===== Error usage, python3 server.py <server_port> <number_of_consecutive_login_attempts> ======\n")
         exit(0)
-    server_host = "127.0.0.1"
+    server_host = gethostname()
     server_port = int(sys.argv[1])
     number_of_consecutive_failed_attempts = int(sys.argv[2])
     if number_of_consecutive_failed_attempts not in range(1,6):

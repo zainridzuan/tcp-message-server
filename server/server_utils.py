@@ -56,3 +56,30 @@ def add_messsagelog(msg_details):
     }
 
     return confirmation
+
+# used to check if a list of users are currently online, if they are online they also must be registered users
+# returns a dictionary with 'username': 'online' | 'offline' | 'invalid'
+def are_they_online(user_list):
+    online = set()
+    with open("userlog.txt", "r") as f:
+        lines = f.readlines()
+        for line in lines:
+            online.add(line.split(";")[2])
+
+    valid_users = set()
+    with open("credentials.txt", "r") as f:
+        lines = f.readlines()
+        for line in lines:
+            valid_users.add(line.split()[0])   
+    print(valid_users)
+
+    dict = {}
+    for user in user_list:
+        if user in online:
+            dict[user] = "online"
+        else:
+            if user in valid_users:
+                dict[user] = "offline"
+            else:
+                dict[user] = "invalid"
+    return dict

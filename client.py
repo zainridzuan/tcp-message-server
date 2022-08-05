@@ -86,6 +86,10 @@ def connect_to_server(server_name, server_port):
             payload = client_socket.recv(1024)
             msg = json.loads(payload.decode('utf-8'))
             print(f"> {msg['message_type']}; {msg['sequence_number']}; {msg['timestamp']}")
+        elif recv_message == "successful separate room creation":
+            payload = client_socket.recv(1024)
+            room_info = json.loads(payload.decode('utf-8'))
+            print(f"Separate chat room has been created, room ID: {room_info['room_id']}, users in this room: {room_info['users']}")
         else:
             print("> [recv] Invalid command!")
 
