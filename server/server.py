@@ -165,10 +165,11 @@ class ClientThread(Thread):
             "username": dict['username'],
             "message": message
         }
-        add_messsagelog(msg_details)
-        print(f"[send] message sent successfully for {self.client_address}")
+        msg_confirm = add_messsagelog(msg_details)
         server_message = "message sent successfully"
-        self.client_socket.sendall('message sent successfully'.encode())
+        self.client_socket.sendall(server_message.encode())
+        self.client_socket.sendall(msg_confirm.encode())
+        print(f"[send] message sent successfully for {self.client_address}")
 
     # handles download active users
     def process_atu(self):

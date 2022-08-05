@@ -48,3 +48,4 @@ def add_messsagelog(msg_details):
     f = open("messagelog.txt", "a")
     f.write(f"{msg_details['message sequence number']}; {msg_details['timestamp']}; {msg_details['username']}; {msg_details['message']};\n")
     f.close
+    return f"Broadcast Message; {msg_details['message sequence number']}; {msg_details['timestamp']};"
