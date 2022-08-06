@@ -25,10 +25,11 @@ def user_login(username, password, client_socket):
         "password": password
     }
 
-    client_socket.send(bytes(json.dumps(request).encode()))
+    payload = json.dumps(request)
+    client_socket.sendall(bytes(payload.encode()))
     while True:
         payload = client_socket.recv(1024)
-        response = payload.decode('utf-8')
+        response = payload.decode()
         # We wait to receive the reply from the server, store it in response
         if response == "login success":
             print("> Login Successful!")
@@ -39,7 +40,8 @@ def user_login(username, password, client_socket):
             request["password"] = getpass()
             client_socket.sendall("login".encode())
             client_socket.recv(1024)
-            client_socket.send(bytes(json.dumps(request), encoding='utf-8'))
+            payload = json.dumps(request)
+            client_socket.sendall(bytes(payload.encode()))
         elif response == "user blocked":
             print("> Your account has been blocked due to multiple unsuccessful login attempts. Please try again later.")
             exit()
@@ -75,7 +77,7 @@ def connect_to_server(server_name, server_port):
             break
         elif recv_message == "active users request":
             payload = client_socket.recv(1024)
-            everyone_else_userlog = json.loads(payload.decode('utf-8'))
+            everyone_else_userlog = json.loads(payload.decode())
             if everyone_else_userlog == []:
                 print("> No other active users...")
             else:
@@ -84,21 +86,24 @@ def connect_to_server(server_name, server_port):
         elif recv_message == "message sent successfully":
             print("> Message sent successfully!")
             payload = client_socket.recv(1024)
-            msg = json.loads(payload.decode('utf-8'))
+            msg = json.loads(payload.decode())
             print(f"> {msg['message_type']}; {msg['sequence_number']}; {msg['timestamp']}")
         elif recv_message == "successful separate room creation":
             payload = client_socket.recv(1024)
-            room_info = json.loads(payload.decode('utf-8'))
+            room_info = json.loads(payload.decode())
             print(f"> Separate chat room has been created, room ID: {room_info['room_id']}, users in this room: {room_info['users']}")
-        elif recv_message == "unsuccesful room creation":
+        elif recv_message == "unsuccessful room creation":
             print(f"> Unsuccessful room creation. You can't create a room for yourself.")
         elif recv_message == "invalid room creation":
             payload = client_socket.recv(1024)
-            offline_invalid = json.loads(payload.decode('utf-8'))
+            offline_invalid = json.loads(payload.decode())
             offline_users = offline_invalid['offline']
             invalid_users = offline_invalid['invalid']
-            print(f"Couldn't create room. Offline users: {offline_users}. Invalid users: {invalid_users}")
-            print("errors")
+            print(f"> Couldn't create room. Offline users: {offline_users}. Invalid users: {invalid_users}")
+        elif recv_message == "room exists":
+            payload = client_socket.recv(1024)
+            room = json.loads(payload.decode())
+            print(f"> Couldn't create room. A room (ID: {room['room_id']}) with these users already exits!")
         else:
             print(recv_message)
             print("> [recv] Invalid command!")

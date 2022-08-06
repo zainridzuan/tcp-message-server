@@ -15,7 +15,7 @@ from server_utils import *
 from threading import Thread
 from numpy import number
 from datetime import datetime, timedelta
-import json, sys, select, re
+import json, sys, re
 
 number_of_consecutive_failed_attempts = 0
 login_attempts = {}
@@ -32,7 +32,7 @@ class ClientThread(Thread):
         self.client_address = client_address
         self.client_socket = client_socket
         self.client_alive = False        
-        print(f"===== New connection created for: {client_address} =====")
+        print(f"===== new connection created for: {client_address} =====")
         self.client_alive = True
 
     def run(self): 
@@ -51,15 +51,16 @@ class ClientThread(Thread):
                 
                 # remove user off active_users and userlog and then update userlog.txt
                 dict = address_to_userlog_dict(userlog, self.client_address)
-                username = dict["username"]
-                index = active_users.index(username)
-                active_users.remove(username)
-                seq_no = dict["active user sequence number"]
-                userlog[:] = [d for d in userlog if d.get("active user sequence number") != seq_no]
+                if dict is not None:
+                    username = dict["username"]
+                    index = active_users.index(username)
+                    active_users.remove(username)
+                    seq_no = dict["active user sequence number"]
+                    userlog[:] = [d for d in userlog if d.get("active user sequence number") != seq_no]
 
-                for i in range(index, len(userlog)):
-                    userlog[i]["active user sequence number"] = userlog[i]["active user sequence number"] - 1
-                update_userlog(userlog)
+                    for i in range(index, len(userlog)):
+                        userlog[i]["active user sequence number"] = userlog[i]["active user sequence number"] - 1
+                    update_userlog(userlog)
                 break
             elif message == "login":
                 print(f"[recv] new login request from {self.client_address}")
@@ -108,7 +109,7 @@ class ClientThread(Thread):
         self.client_socket.sendall(server_message.encode())
 
         payload = self.client_socket.recv(1024)
-        client_request = json.loads(payload.decode('utf-8'))
+        client_request = json.loads(payload.decode())
 
         credentials = read_credentials()
         username = client_request['username']
@@ -180,7 +181,8 @@ class ClientThread(Thread):
         msg_confirm = add_messsagelog(msg_details)
         server_message = "message sent successfully"
         self.client_socket.sendall(server_message.encode())
-        self.client_socket.send(bytes(json.dumps(msg_confirm).encode()))
+        payload = json.dumps(msg_confirm)
+        self.client_socket.send(bytes(payload.encode()))
         print(f"[send] message sent successfully for {self.client_address}")
 
     # handles download active users
@@ -192,20 +194,13 @@ class ClientThread(Thread):
         server_message = "active users request"
         print(f"[send] {server_message} for {self.client_address}") 
         self.client_socket.sendall(server_message.encode())
-        self.client_socket.send(bytes(json.dumps(everyone_else_log).encode()))
+        payload = json.dumps(everyone_else_log)
+        self.client_socket.send(bytes(payload.encode()))
 
     # handle separate room building
     def process_srb(self, user_list):
-        global rooms
-        checked_users = are_they_online(user_list)
-        offline = []
-        invalid = []
-        for user in checked_users:
-            if checked_users[user] == "offline":
-                offline.append(user)
-            elif checked_users[user] == "invalid":
-                invalid.append(user)
-        
+        global rooms  
+        # checking if user is trying to create a room for themselves
         requesting_user = address_to_userlog_dict(userlog, self.client_address)['username']
         if user_list == [requesting_user]:
             server_message = "unsuccessful room creation"
@@ -214,6 +209,25 @@ class ClientThread(Thread):
             return 
         else:
             user_list.append(requesting_user)
+
+        # checking if room already exists
+        for room in rooms:
+            if set(user_list) == set(room['users']):
+                print(f"[send] new room could not be created for {self.client_address}")
+                server_message = "room exists"
+                self.client_socket.sendall(server_message.encode())
+                payload = json.dumps(room)
+                self.client_socket.sendall(bytes(payload.encode()))
+                return
+
+        checked_users = are_they_online(user_list)
+        offline = []
+        invalid = []
+        for user in checked_users:
+            if checked_users[user] == "offline":
+                offline.append(user)
+            elif checked_users[user] == "invalid":
+                invalid.append(user)
         
         if not offline and not invalid:
             room_info = {
@@ -225,7 +239,7 @@ class ClientThread(Thread):
             f = open(filename, 'x')
             f.close
             server_message = "successful separate room creation"
-            self.client_socket.sendall(server_message.encode('utf-8'))
+            self.client_socket.sendall(server_message.encode())
             print(f"[send] new room created for {self.client_address}")
             self.client_socket.send(bytes(json.dumps(room_info).encode()))
         else:
