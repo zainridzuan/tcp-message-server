@@ -1,3 +1,5 @@
+import os, re
+
 def read_credentials():
     credentials = {}
     with open('credentials.txt') as credential_list:
@@ -60,18 +62,17 @@ def add_messsagelog(msg_details):
 # used to check if a list of users are currently online, if they are online they also must be registered users
 # returns a dictionary with 'username': 'online' | 'offline' | 'invalid'
 def are_they_online(user_list):
-    online = set()
+    online = []
     with open("userlog.txt", "r") as f:
         lines = f.readlines()
         for line in lines:
-            online.add(line.split(";")[2])
+            online.append(line.split("; ")[2])
 
-    valid_users = set()
+    valid_users = []
     with open("credentials.txt", "r") as f:
         lines = f.readlines()
         for line in lines:
-            valid_users.add(line.split()[0])   
-    print(valid_users)
+            valid_users.append(line.split()[0])   
 
     dict = {}
     for user in user_list:
@@ -83,3 +84,9 @@ def are_they_online(user_list):
             else:
                 dict[user] = "invalid"
     return dict
+
+# utility function to reset rooms and delete all logs
+def reset_rooms():
+    for f in os.listdir("."):
+        if re.match("^SR_[0-9]*_messagelog.txt", f):
+            os.remove(f)

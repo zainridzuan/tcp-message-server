@@ -89,8 +89,18 @@ def connect_to_server(server_name, server_port):
         elif recv_message == "successful separate room creation":
             payload = client_socket.recv(1024)
             room_info = json.loads(payload.decode('utf-8'))
-            print(f"Separate chat room has been created, room ID: {room_info['room_id']}, users in this room: {room_info['users']}")
+            print(f"> Separate chat room has been created, room ID: {room_info['room_id']}, users in this room: {room_info['users']}")
+        elif recv_message == "unsuccesful room creation":
+            print(f"> Unsuccessful room creation. You can't create a room for yourself.")
+        elif recv_message == "invalid room creation":
+            payload = client_socket.recv(1024)
+            offline_invalid = json.loads(payload.decode('utf-8'))
+            offline_users = offline_invalid['offline']
+            invalid_users = offline_invalid['invalid']
+            print(f"Couldn't create room. Offline users: {offline_users}. Invalid users: {invalid_users}")
+            print("errors")
         else:
+            print(recv_message)
             print("> [recv] Invalid command!")
 
     client_socket.close()

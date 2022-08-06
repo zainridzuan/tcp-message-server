@@ -79,10 +79,9 @@ class ClientThread(Thread):
                 self.process_atu()
             elif re.match("SRB [^ ].*", message):
                 print(f"[recv] new SRB request from {self.client_address}")
-                users = message.split(" ", 1)[1]
-                set_users = set(users.split())
-                print(set_users)
-                self.process_srb(set_users)
+                users_str = message.split(" ", 1)[1]
+                users_list = users_str.split()
+                self.process_srb(users_list)
             elif message == "SRM":
                 self.process_srm()
             elif message == "RDM":
@@ -187,48 +186,57 @@ class ClientThread(Thread):
     # handles download active users
     def process_atu(self):
         everyone_else_log = []
-        #print(userlog)
         for i in userlog:
             if i['client IP address'] != self.client_address:
                 everyone_else_log.append(i)
-        print(everyone_else_log)
         server_message = "active users request"
         print(f"[send] {server_message} for {self.client_address}") 
         self.client_socket.sendall(server_message.encode())
         self.client_socket.send(bytes(json.dumps(everyone_else_log).encode()))
 
     # handle separate room building
-    def process_srb(self, user_set):
+    def process_srb(self, user_list):
         global rooms
-        checked_users = are_they_online(user_set)
-        print(checked_users)
-        offline = set()
-        invalid = set()
+        checked_users = are_they_online(user_list)
+        offline = []
+        invalid = []
         for user in checked_users:
             if checked_users[user] == "offline":
-                offline.add(user)
+                offline.append(user)
             elif checked_users[user] == "invalid":
-                invalid.add(user)
-
-        if offline and invalid:
+                invalid.append(user)
+        
+        requesting_user = address_to_userlog_dict(userlog, self.client_address)['username']
+        if user_list == [requesting_user]:
+            server_message = "unsuccessful room creation"
+            print(f"[send] new room could not be created for {self.client_address}")
+            self.client_socket.sendall(server_message.encode())
+            return 
+        else:
+            user_list.append(requesting_user)
+        
+        if not offline and not invalid:
             room_info = {
                 "room_id": len(rooms) + 1,
-                "users": user_set
+                "users": user_list
             }
             rooms.append(room_info)
             filename = f"SR_{room_info['room_id']}_messagelog.txt"
             f = open(filename, 'x')
             f.close
             server_message = "successful separate room creation"
-            self.client_socket.sendall(server_message.encode())
+            self.client_socket.sendall(server_message.encode('utf-8'))
+            print(f"[send] new room created for {self.client_address}")
             self.client_socket.send(bytes(json.dumps(room_info).encode()))
         else:
-            server_message = "unsuccessful room creation"
+            server_message = "invalid room creation"
             self.client_socket.sendall(server_message.encode())
-            server_message = str(offline)
-            self.client_socket.sendall(server_message.encode())
-            server_message = str(invalid)
-            self.client_socket.sendall(server_message.encode())
+            print(f"[send] new room could not be created for {self.client_address}")
+            invalid_users = {
+                "offline": offline,
+                "invalid": invalid
+            }
+            self.client_socket.send(bytes(json.dumps(invalid_users).encode()))
 
 
     # handle separate room message
@@ -249,7 +257,7 @@ def start_server(server_host, server_port):
     server_address = (server_host, server_port)
     server_socket = socket(AF_INET, SOCK_STREAM)
     server_socket.bind(server_address)
-    print("The server is ready to receive...")
+    print(f"The server is running on {gethostbyname(gethostname())}")
 
     while True:
         server_socket.listen(1)
@@ -271,4 +279,5 @@ if __name__ == "__main__":
     
     clear_userlog()
     clear_messagelog()
+    reset_rooms()
     start_server(server_host, server_port)
