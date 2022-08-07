@@ -90,3 +90,17 @@ def reset_rooms():
     for f in os.listdir("."):
         if re.match("^SR_[0-9]*_messagelog.txt", f):
             os.remove(f)
+
+# helper function to add message to separate room 
+def add_messagesr(filename, msg_details):
+    f = open(filename, "a")
+    f.write(f"{msg_details['message sequence number']}; {msg_details['timestamp']}; {msg_details['username']}; {msg_details['message']};\n")
+    f.close
+
+    confirmation = {
+        "message_type": "Separate room message",
+        "sequence_number": msg_details['message sequence number'],
+        "timestamp": msg_details['timestamp']
+    }
+
+    return confirmation

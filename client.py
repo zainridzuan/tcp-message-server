@@ -61,7 +61,7 @@ def connect_to_server(server_name, server_port):
             sent_message = input("===== Enter one of the following commands [BCM, ATU, SRB, SRM, RDM, OUT] =====\n> ")
             client_socket.sendall(sent_message.encode())
 
-        data = client_socket.recv(1024)
+        data = client_socket.recv(2048)
         recv_message = data.decode()
 
         # parse the message received from server and take corresponding actions
@@ -104,6 +104,40 @@ def connect_to_server(server_name, server_port):
             payload = client_socket.recv(1024)
             room = json.loads(payload.decode())
             print(f"> Couldn't create room. A room (ID: {room['room_id']}) with these users already exits!")
+        elif recv_message == "successful separate room message":
+            print("> Message sent successfully!")
+            payload = client_socket.recv(1024)
+            msg = json.loads(payload.decode())
+            print(f"> {msg['message_type']}; {msg['sequence_number']}; {msg['timestamp']}")
+        elif recv_message == "user not in room":
+            print("> Message usuccessful! User is not in this room")
+        elif recv_message == "room doesn't exist":
+            print("> Message usuccessful! This room doesn't exist")
+        elif recv_message == "read bc messages success":
+            print("> Reading messages...")
+            payload = client_socket.recv(1024)
+            read_this = json.loads(payload.decode())
+            if read_this['messages'] is None:
+                print("> No messages to be read...")
+            else:
+                print(f"Broadcasted messages since {read_this['datetime']}:")
+                for msg in read_this['messages']:
+                    print(msg)
+        elif recv_message == "read sr messages success":
+            print("> Reading messages...")
+            payload = client_socket.recv(1024)
+            read_this = json.loads(payload.decode())
+            print(read_this)
+            if read_this is None:
+                print("> No messages to be read...")
+            else:
+                print(f"Messages in separate room since {read_this[0]['datetime']}:")
+                print(read_this)
+                for room in read_this['messages']:
+                    print(room['room_id'])
+                    for msg in room['messages']:
+                        print(msg)
+                
         else:
             print(recv_message)
             print("> [recv] Invalid command!")

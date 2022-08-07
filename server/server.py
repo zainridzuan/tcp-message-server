@@ -66,7 +66,7 @@ class ClientThread(Thread):
                 print(f"[recv] new login request from {self.client_address}")
                 self.process_login()
             elif re.match("BCM *", message):
-                if re.match("BCM\s+(?![a-zA-Z!@#$%.?,])", message): 
+                if re.match("BCM\s+(?![a-zA-Z0-9!@#$%.?,])", message): 
                     print(f"[recv] invalid BCM request from {self.client_address}")
                     server_message = "invalid BCM request"
                     self.client_socket.sendall(server_message.encode()) 
@@ -83,10 +83,37 @@ class ClientThread(Thread):
                 users_str = message.split(" ", 1)[1]
                 users_list = users_str.split()
                 self.process_srb(users_list)
-            elif message == "SRM":
-                self.process_srm()
-            elif message == "RDM":
-                self.process_rdm()
+            elif re.match("SRM.*", message):
+                args = message.split()
+                if len(args) != 3:
+                    print(f"[recv] invalid SRM request from {self.client_address}")
+                    server_message = "invalid SRM request"
+                    self.client_socket.sendall(server_message.encode()) 
+                else:
+                    room_id = int(args[1])
+                    message = args[2]
+                    if isinstance(room_id, int) and isinstance(message, str):
+                        print(f"[recv] SRM request from {self.client_address}")
+                        self.process_srm(room_id, message)
+                    else:
+                        print(f"[recv] invalid SRM request from {self.client_address}")
+                        server_message = "invalid SRM request"
+                        self.client_socket.sendall(server_message.encode()) 
+            elif re.match("RDM.*", message):
+                args = message.split(" ", 2)
+                print(f"{type(args[2])}, {args[2]}")
+                print(args[1])
+                if len(args) != 3:
+                    print(f"[recv] invalid RDM request from {self.client_address}")
+                    server_message = "invalid RDM request"
+                    self.client_socket.sendall(server_message.encode()) 
+                if ( args[1] == 'b' or args[1] == 's') and isinstance(args[2], str):
+                    print(f"[recv] RDM request from {self.client_address}")
+                    self.process_rdm(args[1], args[2])
+                else: 
+                    print(f"[recv] invalid RDM request from {self.client_address}")
+                    server_message = "invalid RDM request"
+                    self.client_socket.sendall(server_message.encode()) 
             elif message == "OUT":
                 print(f"[recv] new logout request from {self.client_address}")
                 self.process_out()
@@ -148,7 +175,7 @@ class ClientThread(Thread):
                 # active user sequence number; timestamp; username; client IP address; client UDP server port number
                 login_info = {
                     "active user sequence number": active_users.index(username) + 1,
-                    "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    "timestamp": datetime.now().strftime("%d %b %Y %H:%M:%S"),
                     "username": username,                        
                     "client IP address": self.client_address                  
                     #"client UDP server port number": ""           
@@ -174,7 +201,7 @@ class ClientThread(Thread):
         dict = address_to_userlog_dict(userlog, self.client_address)
         msg_details = { 
             "message sequence number": message_count,
-            "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "timestamp": datetime.now().strftime("%d %b %Y %H:%M:%S"),
             "username": dict['username'],
             "message": message
         }
@@ -232,7 +259,8 @@ class ClientThread(Thread):
         if not offline and not invalid:
             room_info = {
                 "room_id": len(rooms) + 1,
-                "users": user_list
+                "users": user_list,
+                "message_count": 0
             }
             rooms.append(room_info)
             filename = f"SR_{room_info['room_id']}_messagelog.txt"
@@ -254,13 +282,94 @@ class ClientThread(Thread):
 
 
     # handle separate room message
-    def process_srm(self):
-        return None 
+    def process_srm(self, room_id, message):
+        global rooms
+        username = address_to_userlog_dict(userlog, self.client_address)['username']
+        index = int(room_id) - 1
+        if len(rooms) >= index:
+            if rooms[index]["room_id"] == room_id:
+                if username in rooms[index]["users"]:
+                    log = f"SR_{room_id}_messagelog.txt"
+                    msg_details = {
+                        "message sequence number": rooms[index]["message_count"] + 1,
+                        "timestamp": datetime.now().strftime("%d %b %Y %H:%M:%S"),
+                        "username": username,
+                        "message": message
+                    }
+                    msg_confirm = add_messagesr(log, msg_details)
+                    server_message = "successful separate room message"
+                    self.client_socket.sendall(server_message.encode())
+                    payload = json.dumps(msg_confirm)
+                    self.client_socket.send(bytes(payload.encode()))
+                    print(f"[send] successful separate room message request for {self.client_address}")
+                else: 
+                    print(f"[send] invalid separate room message request for {self.client_address}")
+                    server_message = "user not in room"
+                    self.client_socket.sendall(server_message.encode())
+            else:
+                print(f"[send] invalid separate room message request for {self.client_address}")
+                server_message = "room doesn't exist"
+                self.client_socket.sendall(server_message.encode())
+        else: 
+            print(f"[send] invalid separate room message request for {self.client_address}")
+            server_message = "room doesn't exist"
+            self.client_socket.sendall(server_message.encode())
 
     # handles read message
-    def process_rdm(self):
-        return None
-
+    def process_rdm(self, message_type, datetime_string):
+        # time string to time variable
+        timestamp = datetime.strptime(datetime_string, "%d %b %Y %H:%M:%S")
+        # 
+        msg_to_read = []
+        if message_type == 'b':
+            with open("messagelog.txt", "r") as file:
+                for line in file:
+                    strip = line.split("; ")
+                    seq_no = strip[0]
+                    line_date_str = strip[1]
+                    #line_date_str = line_date_str[:-1]
+                    user = strip[2]
+                    message = strip[3]
+                    message = message[:-2]
+                    line_date = datetime.strptime(line_date_str, "%d %b %Y %H:%M:%S")
+                    if line_date > timestamp:
+                        msg_to_read.append(f"{seq_no}; {user}: {message} at {line_date_str}")            
+            read_messages_info = {
+                "messages": msg_to_read,
+                "datetime": datetime_string
+            }
+            server_message = "read bc messages success"
+            self.client_socket.sendall(server_message.encode())
+            payload = json.dumps(read_messages_info)
+            self.client_socket.send(bytes(payload.encode()))
+        elif message_type == 's':
+            read_messages_info = []
+            requesting_user = address_to_userlog_dict(userlog, self.client_address)
+            for room in rooms:
+                if requesting_user in room["users"]:
+                    fname = f"SR_{room['room_id']}_messagelog.txt"
+                    with open(fname, "r") as file:
+                        for line in file:
+                            strip = line.split("; ")
+                            seq_no = strip[0]
+                            line_date_str = strip[1]
+                            user = strip[2]
+                            message = strip[3]
+                            message = message[:-2]
+                            line_date = datetime.strptime(line_date_str, "%d %b %Y %H:%M:%S")
+                            if line_date > timestamp:
+                                msg_to_read.append(f"{seq_no}; {user}: {message} at {line_date_str}")
+                                tmp = {
+                                    'room_id': room['room_id'],
+                                    'messages': msg_to_read,
+                                    'datetime': datetime_string
+                                }
+                                read_messages_info.append(tmp)     
+            server_message = "read sr messages success"
+            self.client_socket.sendall(server_message.encode())
+            payload = json.dumps(read_messages_info)
+            self.client_socket.send(bytes(payload.encode()))
+    
     # handles logout
     def process_out(self):
         server_message = "logout request"
