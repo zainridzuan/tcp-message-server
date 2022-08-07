@@ -101,8 +101,6 @@ class ClientThread(Thread):
                         self.client_socket.sendall(server_message.encode()) 
             elif re.match("RDM.*", message):
                 args = message.split(" ", 2)
-                print(f"{type(args[2])}, {args[2]}")
-                print(args[1])
                 if len(args) != 3:
                     print(f"[recv] invalid RDM request from {self.client_address}")
                     server_message = "invalid RDM request"
@@ -344,11 +342,12 @@ class ClientThread(Thread):
             self.client_socket.send(bytes(payload.encode()))
         elif message_type == 's':
             read_messages_info = []
-            requesting_user = address_to_userlog_dict(userlog, self.client_address)
+            requesting_user = address_to_userlog_dict(userlog, self.client_address)["username"]
             for room in rooms:
                 if requesting_user in room["users"]:
                     fname = f"SR_{room['room_id']}_messagelog.txt"
                     with open(fname, "r") as file:
+                        msg_to_read = []
                         for line in file:
                             strip = line.split("; ")
                             seq_no = strip[0]
@@ -359,12 +358,12 @@ class ClientThread(Thread):
                             line_date = datetime.strptime(line_date_str, "%d %b %Y %H:%M:%S")
                             if line_date > timestamp:
                                 msg_to_read.append(f"{seq_no}; {user}: {message} at {line_date_str}")
-                                tmp = {
-                                    'room_id': room['room_id'],
-                                    'messages': msg_to_read,
-                                    'datetime': datetime_string
-                                }
-                                read_messages_info.append(tmp)     
+                        tmp = {
+                            'room_id': room['room_id'],
+                            'messages': msg_to_read,
+                            'datetime': datetime_string
+                        }
+                        read_messages_info.append(tmp)     
             server_message = "read sr messages success"
             self.client_socket.sendall(server_message.encode())
             payload = json.dumps(read_messages_info)

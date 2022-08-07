@@ -127,14 +127,12 @@ def connect_to_server(server_name, server_port):
             print("> Reading messages...")
             payload = client_socket.recv(1024)
             read_this = json.loads(payload.decode())
-            print(read_this)
-            if read_this is None:
+            if not read_this:
                 print("> No messages to be read...")
             else:
                 print(f"Messages in separate room since {read_this[0]['datetime']}:")
-                print(read_this)
-                for room in read_this['messages']:
-                    print(room['room_id'])
+                for room in read_this:
+                    print(f"Room {room['room_id']}:")
                     for msg in room['messages']:
                         print(msg)
                 
