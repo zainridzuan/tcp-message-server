@@ -5,8 +5,21 @@ Users can message each other in a public room, as well as create private rooms t
 
 ## Commands
 ### BCM
+- Broadcast message
+- usage: BCM [message]
 ### ATU
+- Download active users
+- usage: ATU
 ### SRB
+- Separate room building
+- usage: SRB [username1] [username2] ...
 ### SRM
+- Separate room message
+- usage: SRM [room_id] [message]
 ### RDM
+- Read messages
+- message type is either b or s, for broadcast messages or separate room messages
+- usage: RDM [message_type] [timestamp]
 ### OUT
+- Logout
+- usage: OUT
