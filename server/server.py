@@ -13,8 +13,7 @@ The server needs to be ran before the clients. Needs to be initiated as:
 from socket import * 
 from server_utils import *
 from threading import Thread
-from numpy import number
-from datetime import datetime, timedelta
+from datetime import datetime
 import json, sys, re
 
 number_of_consecutive_failed_attempts = 0
@@ -44,7 +43,7 @@ class ClientThread(Thread):
             data = self.client_socket.recv(4096)
             message = data.decode()
 
-            # if the message from client is empty, the client would be off-line then set the client as offline (alive=Flase)
+            # if the message from client is empty, the client would be offline then set the client as offline (alive=Flase)
             if message == "":
                 self.client_alive = False
                 print(f"===== the user disconnected - {self.client_address}")
@@ -62,9 +61,12 @@ class ClientThread(Thread):
                         userlog[i]["active user sequence number"] = userlog[i]["active user sequence number"] - 1
                     update_userlog(userlog)
                 break
-            elif message == "login":
+            elif message == "Login":
                 print(f"[recv] new login request from {self.client_address}")
                 self.process_login()
+            elif message == "Register":
+                print(f"[recv] new register request from {self.client_address}")
+                self.process_register()
             elif re.match("BCM *", message):
                 if re.match("BCM\s+(?![a-zA-Z0-9!@#$%.?,])", message): 
                     print(f"[recv] invalid BCM request from {self.client_address}")
@@ -119,7 +121,43 @@ class ClientThread(Thread):
                 print(f"[recv] unknown input from {self.client_address}")
                 server_message = "unknown input"
                 self.client_socket.sendall(server_message.encode())
-            
+
+    # handle client register
+    def process_register(self):
+        global userlog
+        global active_users
+
+        server_message = "user register request"
+        print(f"[send] {server_message} for {self.client_address}")
+        self.client_socket.sendall(server_message.encode())
+
+        payload = self.client_socket.recv(1024)
+        rego_details = json.loads(payload.decode())
+
+        username = rego_details['username']
+        password = rego_details['password']
+        
+        # checking if username already exists
+        if do_they_exist(username) is True:
+            print(f"[send] error: username exists already {self.client_address}")
+            self.client_socket.send("registration failure: username".encode())
+        else:
+            append_credentials(username, password)
+            active_users.append(username)
+            print(f"[send] registration success for {self.client_address}")
+            # send json with following information
+            # active user sequence number; timestamp; username; client IP address; client UDP server port number
+            register_info = {
+                "active user sequence number": active_users.index(username) + 1,
+                "timestamp": datetime.now().strftime("%d %b %Y %H:%M:%S"),
+                "username": username,                        
+                "client IP address": self.client_address                  
+                #"client UDP server port number": ""           
+            }
+            userlog.append(register_info)
+            add_userlog(register_info)
+            self.client_socket.send("registration success".encode())
+
     # handle client login
     def process_login(self):
         global login_attempts
@@ -129,7 +167,7 @@ class ClientThread(Thread):
         global active_users
         global userlog
         
-        server_message = "user credentials request"
+        server_message = "user login request"
         print(f"[send] {server_message} for {self.client_address}")
         self.client_socket.sendall(server_message.encode())
 
@@ -294,7 +332,7 @@ class ClientThread(Thread):
                         "username": username,
                         "message": message
                     }
-                    msg_confirm = add_messagesr(log, msg_details)
+                    msg_confirm = add_messages_r(log, msg_details)
                     server_message = "successful separate room message"
                     self.client_socket.sendall(server_message.encode())
                     payload = json.dumps(msg_confirm)
@@ -379,20 +417,25 @@ def start_server(server_host, server_port):
     server_address = (server_host, server_port)
     server_socket = socket(AF_INET, SOCK_STREAM)
     server_socket.bind(server_address)
-    print(f"The server is running on {gethostbyname(gethostname())}")
-
+    print(f"The server is running on {server_host}")
+    
+    
     while True:
-        server_socket.listen(1)
-        client_socket, client_address = server_socket.accept()
-        client_thread = ClientThread(client_address, client_socket)
-        client_thread.start()
+        try: 
+            server_socket.listen(1)
+            client_socket, client_address = server_socket.accept()
+            client_thread = ClientThread(client_address, client_socket)
+            client_thread.start()
+        except KeyboardInterrupt:
+            print("\n===== Keyboard interrupt received. Server has been closed =====")
+            break
 
 if __name__ == "__main__":
     # acquire server host and port from command line parameter
     if len(sys.argv) != 3:
         print("\n===== Error usage, python3 server.py <server_port> <number_of_consecutive_login_attempts> ======\n")
         exit(0)
-    server_host = gethostname()
+    server_host = '127.0.0.1'
     server_port = int(sys.argv[1])
     number_of_consecutive_failed_attempts = int(sys.argv[2])
     if number_of_consecutive_failed_attempts not in range(1,6):
