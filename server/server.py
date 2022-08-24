@@ -418,12 +418,17 @@ def start_server(server_host, server_port):
     server_socket = socket(AF_INET, SOCK_STREAM)
     server_socket.bind(server_address)
     print(f"The server is running on {server_host}")
-
+    
+    
     while True:
-        server_socket.listen(1)
-        client_socket, client_address = server_socket.accept()
-        client_thread = ClientThread(client_address, client_socket)
-        client_thread.start()
+        try: 
+            server_socket.listen(1)
+            client_socket, client_address = server_socket.accept()
+            client_thread = ClientThread(client_address, client_socket)
+            client_thread.start()
+        except KeyboardInterrupt:
+            print("\n===== Keyboard interrupt received. Server has been closed =====")
+            break
 
 if __name__ == "__main__":
     # acquire server host and port from command line parameter
