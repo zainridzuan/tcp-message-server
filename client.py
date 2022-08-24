@@ -48,6 +48,29 @@ def user_login(username, password, client_socket):
         else:
             print(response)
 
+def user_register(username, password, client_socket):
+   global authenticated
+   request = {
+       "username": username,
+       "password": password
+   }
+
+   payload = json.dumps(request)
+   client_socket.sendall(bytes(payload.encode()))
+   while True:
+       payload = client_socket.recv(1024)
+       response = payload.decode()
+       # We wait to receive the reply from the server, store it in response
+       if response == "registration success":
+           print("> Registration Successful!")
+           authenticated = True
+           return True
+       elif response == "registration failure: username":
+           print("> Username already exists. Please try a different username.")
+           return False
+       else:
+           print(response)
+           return False
 
 def connect_to_server(server_name, server_port):
     client_socket = socket(AF_INET, SOCK_STREAM)
@@ -55,8 +78,8 @@ def connect_to_server(server_name, server_port):
     initial_login = True
     while True:
         if initial_login == True:
-            client_socket.sendall("login".encode())
-            initial_login = False
+            sent_message = input("===== Enter one of the following commands [Login, Register] =====\n> ")
+            client_socket.sendall(sent_message.encode())
         else:
             sent_message = input("===== Enter one of the following commands [BCM, ATU, SRB, SRM, RDM, OUT] =====\n> ")
             client_socket.sendall(sent_message.encode())
@@ -67,11 +90,24 @@ def connect_to_server(server_name, server_port):
         # parse the message received from server and take corresponding actions
         if recv_message == "":
             print("> [recv] Message from server is empty!")
-        elif recv_message == "user credentials request":
+        elif recv_message == "user login request":
             print("> [recv] Please provide username and password to login")
             username = input("username: ")
             password = getpass("password: ")
             user_login(username, password, client_socket)
+            initial_login = False
+        elif recv_message == "user register request":
+            print("> [recv] Please provide username and password to register")
+            username = input("username: ")
+            password = getpass("password: ")
+            password_2 = getpass("confirm password: ")
+            while (password != password_2):
+                print("Passwords do not match. Please try again...")
+                username = input("username: ")
+                password = getpass("password: ")
+                password_2 = getpass("confirm password: ")
+            if user_register(username, password, client_socket) is True:
+                initial_login = False
         elif recv_message == "logout":
             print(f"> Goodbye, {username}")
             break

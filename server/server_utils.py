@@ -11,6 +11,20 @@ def read_credentials():
 
     return credentials
 
+def append_credentials(username, password):
+    with open("credentials.txt", "a") as credentials:
+        credentials.write("\n")
+        credentials.write(f"{username} {password}")
+
+def do_they_exist(username):
+    with open("credentials.txt", "r") as f:
+        credentials = f.readlines()
+        for credential in credentials:
+            credential_user = credential.split()[0]
+            if credential_user == username:
+                return True
+    return False
+
 # used to clear userlog on server startup
 def clear_userlog():
     with open("userlog.txt", "w+") as f:
@@ -92,7 +106,7 @@ def reset_rooms():
             os.remove(f)
 
 # helper function to add message to separate room 
-def add_messagesr(filename, msg_details):
+def add_messages_r(filename, msg_details):
     f = open(filename, "a")
     f.write(f"{msg_details['message sequence number']}; {msg_details['timestamp']}; {msg_details['username']}; {msg_details['message']};\n")
     f.close
